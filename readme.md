@@ -1,4 +1,4 @@
-Collecting workspace information# Email Service - Developer Guide
+# Email Service - Developer Guide
 
 ## 1. Introduction
 
