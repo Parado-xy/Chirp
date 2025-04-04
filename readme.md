@@ -320,4 +320,3 @@ Future features planned:
 
 This documentation provides a comprehensive guide to the Email Service API. For specific customization needs or further assistance, please contact the service administrator.
 
-Similar code found with 2 license types
