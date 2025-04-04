@@ -14,6 +14,7 @@
  * @requires ../routes/dispatcher.routes
  * @requires ../middlewares/error.middlewares
  * @requires ../databases/mongodb.databases
+ * @requires ../databases/redis.databases
  * 
  * @author Omajuwa Jalla
  * @created 4/2/2025
@@ -27,6 +28,9 @@ import helmet from "helmet";
 
 // Import ENV variables.
 import { PORT, NODE_ENV, VERSION } from "./env.js";
+
+// Import the Redis initialization function
+import redisClient, { initializeRedis } from '../databases/redis.databases.js';
 
 // Instantiate server. 
 const server = express(); 
@@ -82,27 +86,40 @@ server.use(errorMiddleware);
  * Establishes connection to MongoDB using mongoose
  * 
  * @async
- * @function startDB
+ * @function connectToDatabase
  * @returns {Promise<void>}
  */
 import connectToDatabase from "../databases/mongodb.databases.js";
-async function startDB(){
-    console.log(`Connecting to Database...`)
-   await connectToDatabase()
-}
 
 /**
- * Start the HTTP server and initialize the database connection
+ * Start the HTTP server and initialize the database and Redis connections
  * Listens on the port specified in environment variables
  */
-server.listen(PORT, async ()=> {
-    console.log(`Port listening on: http://localhost:${PORT}
-        This is application version ${VERSION}`); 
-    await startDB(); 
-});
+async function startServer() {
+  try {
+    // Connect to MongoDB
+    console.log('Connecting to MongoDB...');
+    await connectToDatabase();
+    
+    // Connect to Redis
+    console.log('Connecting to Redis...');
+    const redisConnected = await initializeRedis();
+    
+    if (!redisConnected) {
+      console.error('WARNING: Redis connection failed. Email functionality will be limited.');
+    }
+    
+    // Start the server only after connections are initialized
+    server.listen(PORT, () => {
+      console.log(`Server listening on http://localhost:${PORT}`);
+      console.log(`API version: ${VERSION}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+}
 
-/**
- * No explicit export as this is the application entry point
- */
+startServer();
 
 

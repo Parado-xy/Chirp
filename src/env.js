@@ -31,5 +31,8 @@ export const {
   MAIL_SERVICE_PROVIDER,
   VERSION,
   DB_URI,
+  REDIS_HOST,
+  REDIS_PORT,
+  REDIS_PASSWORD,
   // eslint-disable-next-line no-undef
 } = process.env;

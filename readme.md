@@ -1,33 +1,35 @@
-# Email Service - Developer Guide
+Collecting workspace information# Email Service - Developer Guide
 
 ## 1. Introduction
 
-Welcome to the Email Service API documentation! This microservice provides a robust solution for programmatically sending emails through a RESTful API interface. By abstracting away the complexities of email delivery, organizations can easily integrate email functionality into their applications.
+Welcome to the Email Service API documentation! This microservice provides a robust solution for programmatically sending emails through a RESTful API interface. By abstracting away the complexities of email delivery, organizations can easily integrate email functionality into their applications. The service implements an asynchronous processing architecture for reliable, high-volume email delivery.
 
 ## 2. System Architecture
 
-The service follows a modular microservice architecture:
+The service follows a modular microservice architecture with asynchronous job processing:
 
 ```
-┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│   Your Service   │     │   Email Service  │     │   Email Provider │
-│   or Application │────▶       API          ────▶    (Gmail, etc.) │
-└──────────────────┘     └──────────────────┘     └──────────────────┘
-                                  │
-                                  │
-                         ┌────────▼─────────┐
-                         │                  │
-                         │    MongoDB       │
-                         │   Database       │
-                         │                  │
-                         └──────────────────┘
+┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+│   Your Service   │     │   Email Service  │     │  Redis Queue &   │     │   Email Provider │
+│   or Application │────▶│      API         │────▶│  Worker Process  │────▶│   (Gmail, etc.) │
+└──────────────────┘     └──────────────────┘     └──────────────────┘     └──────────────────┘
+                                  │                        │
+                                  │                        │
+                         ┌────────▼────────────────────────▼─────────┐
+                         │                                           │
+                         │               MongoDB                     │
+                         │              Database                     │
+                         │                                           │
+                         └───────────────────────────────────────────┘
 ```
 
 ### Core Components:
 
 - **API Layer**: Express.js REST endpoints
 - **Authentication**: API key-based security
-- **Data Storage**: MongoDB for organization data
+- **Data Storage**: MongoDB for organization and email data
+- **Job Queue**: Redis with BullMQ for reliable asynchronous processing
+- **Worker Process**: Background email sending with automatic retries
 - **Email Delivery**: Nodemailer with configurable providers
 - **Error Handling**: Centralized error processing
 
@@ -37,6 +39,7 @@ The service follows a modular microservice architecture:
 
 - Node.js (v14+)
 - MongoDB (local or hosted)
+- Redis server (local or hosted)
 - SMTP credentials (Gmail or other provider)
 
 ### Installation Steps
@@ -51,9 +54,13 @@ The service follows a modular microservice architecture:
    cp config/.env.development.locals.example config/.env.development.locals
    ```
 4. Edit .env.development.locals with your settings
-5. Start the service:
+5. Start the API service:
    ```
    npm run dev
+   ```
+6. Start the worker process (in a separate terminal):
+   ```
+   node src/worker.js
    ```
 
 ## 4. Authentication
@@ -107,8 +114,8 @@ Request Body:
 Response:
 {
   "success": true,
-  "message": "Email sent successfully",
-  "messageId": "<random-id@gmail.com>"
+  "message": "Email queued successfully",
+  "emailId": "64f7a9b2e8d52a1f880c5e12"
 }
 ```
 
@@ -202,6 +209,9 @@ print(result)
 | `MAIL_SERVICE_PROVIDER` | Email provider | `gmail` |
 | `DB_URI` | MongoDB connection | `mongodb://localhost:27017/MailService` |
 | `VERSION` | API version | `v1` |
+| `REDIS_HOST` | Redis server hostname | `localhost` or `172.22.86.56` |
+| `REDIS_PORT` | Redis server port | `6379` |
+| `REDIS_PASSWORD` | Redis server password | `your-redis-password` |
 
 ## 8. Error Handling
 
@@ -223,23 +233,52 @@ Common error scenarios:
 | 403 | Account not active | Contact support to activate your account |
 | 429 | Rate limit/quota exceeded | Wait or request a quota increase |
 | 500 | Server error | Contact support with error details |
+| 503 | Service unavailable | Redis queue service is down |
 
-## 9. Limitations and Usage Policies
+## 9. Asynchronous Processing
+
+This service processes emails asynchronously for improved reliability:
+
+1. When an email is requested, it is stored in the database and queued in Redis
+2. The API responds immediately with a success status and email ID
+3. A separate worker process picks up the email job and attempts delivery
+4. Failed deliveries are automatically retried with exponential backoff
+5. Email status is tracked in the database (queued, sent, failed)
+
+### Running the Worker
+
+The worker process must be running to send emails:
+
+```bash
+# Start the worker process
+node src/worker.js
+```
+
+In production, use a process manager like PM2:
+
+```bash
+npm install -g pm2
+pm2 start src/worker.js --name "email-worker"
+```
+
+## 10. Limitations and Usage Policies
 
 - Daily email quota default: 200 emails per organization
 - Rate limit: Configurable per organization
 - Content restrictions: Follows standard email provider policies
 - Attachment support: Not available in MVP version
+- Worker concurrency: 5 emails processed simultaneously by default
 
-## 10. Best Practices
+## 11. Best Practices
 
 - **Store your API key securely** - Never expose it in client-side code
 - **Handle errors gracefully** - Check for error responses in your code
-- **Implement retry logic** - For temporary failures
+- **Implement idempotent requests** - Avoid duplicate emails on retries
 - **Monitor your usage** - Track your email sending quota
 - **Test thoroughly** - Before sending to real recipients
+- **Use a monitoring tool** - To ensure the worker process stays running
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
 ### Common Issues
 
@@ -248,13 +287,15 @@ Common error scenarios:
    - Ensure proper "Bearer" prefix in Authorization header
 
 2. **Email Not Delivered**
+   - Check if worker process is running
+   - Verify Redis connection is active
    - Check recipient address format
    - Verify your account is active and within quota
    - Check spam folders
 
 3. **Connection Issues**
    - Verify your network connectivity
-   - Check service status
+   - Check MongoDB and Redis service status
 
 ### Getting Support
 
@@ -262,18 +303,21 @@ For technical issues, contact support with:
 1. Your organization ID
 2. Request timestamp
 3. Error message received
-4. Steps to reproduce the issue
+4. Email ID (if available)
+5. Steps to reproduce the issue
 
-## 12. Roadmap
+## 13. Roadmap
 
 Future features planned:
 - Email templates
 - Attachment support
-- Webhook notifications
+- Webhook notifications for email status changes
 - Analytics dashboard
 - Multi-region deployment
+- Horizontal worker scaling
 
 ---
 
 This documentation provides a comprehensive guide to the Email Service API. For specific customization needs or further assistance, please contact the service administrator.
 
+Similar code found with 2 license types

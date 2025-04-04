@@ -10,12 +10,16 @@
  * @requires ../../src/env
  * @requires joi
  * @requires ../../models/organization.model
+ * @requires redisClient
  */
 
 import transporter from "../../services/send-mail.services.js";
 import { SMTP_USER } from "../../src/env.js";
 import Joi from "joi";
 import Organization from "../../models/organization.model.js";
+import { Queue } from "bullmq";
+import Email from "../../models/email.model.js";
+import redisClient, {isRedisConnected} from "../../databases/redis.databases.js";
 
 /**
  * Validation schema for mail requests
@@ -55,6 +59,11 @@ const mailSchema = Joi.object({
         })
 });
 
+// Create redis emailQueue. 
+const emailQueue = new Queue("emailQueue", {
+    connection: redisClient
+}); 
+
 /**
  * Mail handling functions
  * 
@@ -85,6 +94,14 @@ const mailHandler = {
      */
     "send-mail": async (req, res, next) => {
         try {
+            // Check if Redis client is open
+            if (!isRedisConnected()) {
+                return res.status(503).json({
+                    success: false,
+                    message: "Email service temporarily unavailable"
+                });
+            }
+
             // Get the organization from request (set by validateApiKey middleware)
             const organization = req.organization;
             
@@ -114,28 +131,26 @@ const mailHandler = {
                     message: "Daily email quota exceeded"
                 });
             }
-            
-            // Prepare mail options
-            const mailOptions = {
-                from: `"${organization.name} - EMAIL SERVICE" <${SMTP_USER}>`,
-                to,
-                subject,
-                html: `
-                <h3>${subject}</h3>
-                <hr />
-                <p>${content}</p>
-                <hr />
-                <strong>DO NOT REPLY TO THIS EMAIL!</strong>
-                `
-            };
-            
-            // Send email using Promise-based approach
-            const info = await new Promise((resolve, reject) => {
-                transporter.sendMail(mailOptions, (err, info) => {
-                    if (err) reject(err);
-                    else resolve(info);
-                });
-            });
+
+            // Add Email to database. 
+            const email = await Email.create(
+                {
+                    to,
+                    subject,
+                    content,
+                    organization: req.organization._id
+                }
+            );
+
+            await emailQueue.add("sendEmail", {emailId: email._id.toString()}, {
+                attempts: 3,  // Retry up to 3 times
+                backoff: {
+                    type: 'exponential',
+                    delay: 1000  // Starting delay in ms
+                },
+                timeout: 5000 
+            }); 
+                        
             
             // Update organization usage statistics
             await Organization.findByIdAndUpdate(organization._id, {
@@ -144,10 +159,10 @@ const mailHandler = {
             });
             
             // Return success response
-            return res.status(200).json({
+            res.status(200).json({
                 success: true,
-                message: "Email sent successfully",
-                messageId: info.messageId
+                message: "Email queued successfully",
+                emailId: email._id
             });
             
         } catch (err) {
