@@ -1,10 +1,8 @@
-# Email Service - Developer Guide
+# Email & SMS Service API
 
-## 1. Introduction
+A robust microservice for programmatically sending emails and SMS messages through a RESTful API interface. This service implements an asynchronous processing architecture for reliable, high-volume message delivery.
 
-Welcome to the Email Service API documentation! This microservice provides a robust solution for programmatically sending emails through a RESTful API interface. By abstracting away the complexities of email delivery, organizations can easily integrate email functionality into their applications. The service implements an asynchronous processing architecture for reliable, high-volume email delivery.
-
-## 2. System Architecture
+## 1. System Architecture
 
 The service follows a modular microservice architecture with asynchronous job processing:
 
@@ -138,29 +136,29 @@ curl -X POST https://your-api.com/api/v1/mail \
 
 ```javascript
 async function sendEmail(apiKey, to, subject, content) {
-  const response = await fetch('https://your-api.com/api/v1/mail', {
-    method: 'POST',
+  const response = await fetch("https://your-api.com/api/v1/mail", {
+    method: "POST",
     headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
       to,
       subject,
-      content
-    })
+      content,
+    }),
   });
-  
+
   return await response.json();
 }
 
 // Usage
 sendEmail(
-  'your-api-key',
-  'customer@example.com',
-  'Welcome to our service!',
-  '<h1>Welcome</h1><p>Thank you for signing up!</p>'
-).then(result => console.log(result));
+  "your-api-key",
+  "customer@example.com",
+  "Welcome to our service!",
+  "<h1>Welcome</h1><p>Thank you for signing up!</p>"
+).then((result) => console.log(result));
 ```
 
 ### Integration Example (Python)
@@ -171,18 +169,18 @@ import json
 
 def send_email(api_key, to, subject, content):
     url = "https://your-api.com/api/v1/mail"
-    
+
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
-    
+
     payload = {
         "to": to,
         "subject": subject,
         "content": content
     }
-    
+
     response = requests.post(url, headers=headers, json=payload)
     return response.json()
 
@@ -200,18 +198,18 @@ print(result)
 
 ### Environment Variables
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `PORT` | Server port | `5679` |
-| `NODE_ENV` | Environment | `development` |
-| `SMTP_USER` | SMTP username | `your@gmail.com` |
-| `SMTP_PASS` | SMTP password | `your-app-password` |
-| `MAIL_SERVICE_PROVIDER` | Email provider | `gmail` |
-| `DB_URI` | MongoDB connection | `mongodb://localhost:27017/MailService` |
-| `VERSION` | API version | `v1` |
-| `REDIS_HOST` | Redis server hostname | `localhost` or `172.22.86.56` |
-| `REDIS_PORT` | Redis server port | `6379` |
-| `REDIS_PASSWORD` | Redis server password | `your-redis-password` |
+| Variable                | Description           | Example                                 |
+| ----------------------- | --------------------- | --------------------------------------- |
+| `PORT`                  | Server port           | `5679`                                  |
+| `NODE_ENV`              | Environment           | `development`                           |
+| `SMTP_USER`             | SMTP username         | `your@gmail.com`                        |
+| `SMTP_PASS`             | SMTP password         | `your-app-password`                     |
+| `MAIL_SERVICE_PROVIDER` | Email provider        | `gmail`                                 |
+| `DB_URI`                | MongoDB connection    | `mongodb://localhost:27017/MailService` |
+| `VERSION`               | API version           | `v1`                                    |
+| `REDIS_HOST`            | Redis server hostname | `localhost` or `172.22.86.56`           |
+| `REDIS_PORT`            | Redis server port     | `6379`                                  |
+| `REDIS_PASSWORD`        | Redis server password | `your-redis-password`                   |
 
 ## 8. Error Handling
 
@@ -226,14 +224,14 @@ All errors follow a consistent format:
 
 Common error scenarios:
 
-| Status | Scenario | Solution |
-|--------|----------|----------|
-| 400 | Invalid request body | Check your request parameters |
-| 401 | Invalid/missing API key | Verify your Authorization header |
-| 403 | Account not active | Contact support to activate your account |
-| 429 | Rate limit/quota exceeded | Wait or request a quota increase |
-| 500 | Server error | Contact support with error details |
-| 503 | Service unavailable | Redis queue service is down |
+| Status | Scenario                  | Solution                                 |
+| ------ | ------------------------- | ---------------------------------------- |
+| 400    | Invalid request body      | Check your request parameters            |
+| 401    | Invalid/missing API key   | Verify your Authorization header         |
+| 403    | Account not active        | Contact support to activate your account |
+| 429    | Rate limit/quota exceeded | Wait or request a quota increase         |
+| 500    | Server error              | Contact support with error details       |
+| 503    | Service unavailable       | Redis queue service is down              |
 
 ## 9. Asynchronous Processing
 
@@ -283,10 +281,12 @@ pm2 start src/worker.js --name "email-worker"
 ### Common Issues
 
 1. **Authentication Errors**
+
    - Verify API key format (should be a 64-character hex string)
    - Ensure proper "Bearer" prefix in Authorization header
 
 2. **Email Not Delivered**
+
    - Check if worker process is running
    - Verify Redis connection is active
    - Check recipient address format
@@ -300,6 +300,7 @@ pm2 start src/worker.js --name "email-worker"
 ### Getting Support
 
 For technical issues, contact support with:
+
 1. Your organization ID
 2. Request timestamp
 3. Error message received
@@ -309,6 +310,7 @@ For technical issues, contact support with:
 ## 13. Roadmap
 
 Future features planned:
+
 - Email templates
 - Attachment support
 - Webhook notifications for email status changes
@@ -319,4 +321,3 @@ Future features planned:
 ---
 
 This documentation provides a comprehensive guide to the Email Service API. For specific customization needs or further assistance, please contact the service administrator.
-

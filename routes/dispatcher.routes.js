@@ -1,44 +1,39 @@
 /**
- * @fileoverview API Routes Dispatcher
+ * @fileoverview Routes Dispatcher Module
  * 
- * This module connects all route modules to the main Express application.
- * It serves as the central routing configuration, mounting all API endpoints
- * under the versioned API path.
+ * This module configures and attaches all application routes to the Express server.
+ * It centralizes route management and separates route configuration from the main application.
  * 
- * @module dispatcherRoutes
- * @requires express
- * @requires ../src/env
+ * @module routeDispatcher
  * @requires ./auth.routes
  * @requires ./mail.routes
+ * @requires ./web.routes
  */
-
-// Import Dependencies. 
-import express from "express"; 
-
-// Import APPLICATION version.
-import { VERSION } from "../src/env.js"; 
 
 // Import route handlers
-import authRoutes from "./auth.routes.js"; 
-import mailRoutes from "./mail.routes.js"; 
+import authRoutes from './auth.routes.js';
+import mailRoutes from './mail.routes.js';
+import webRoutes from './web.routes.js';
+import smsRouter from './sms.routes.js';
+
+// Import APPLICATION version.
+import { VERSION } from '../src/env.js';
+
 
 /**
- * Connects all route modules to the Express application
+ * Configures and attaches all application routes to the Express server
  * 
  * @function dispatcher
- * @param {express.Application} server - Express application instance
- * @returns {void}
- * 
- * @example
- * import express from 'express';
- * import dispatcher from './routes/dispatcher.routes.js';
- * 
- * const app = express();
- * dispatcher(app);
+ * @param {Object} server - Express server instance
  */
 const dispatcher = (server) => {
-    server.use(`/api/${VERSION}/auth`, authRoutes); 
+    // API routes
+    server.use(`/api/${VERSION}/auth`, authRoutes);
     server.use(`/api/${VERSION}/mail`, mailRoutes);
+    server.use(`/api/${VERSION}/sms`, smsRouter); 
+    
+    // Web interface routes
+    server.use('/', webRoutes);
 };
 
 export default dispatcher;

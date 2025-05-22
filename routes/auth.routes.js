@@ -32,7 +32,9 @@ let authRouter = Router();
  * @bodyparam {string} email - Organization email address
  * @returns {Object} Response with API key or error message
  */
-authRouter.post('/register', authHandler['register-server']); 
+authRouter.post('/register', authHandler['register']); 
+
+authRouter.post('/signin', authHandler['signin']);
 
 /**
  * Note: The 'allow-access' handler is defined but not exposed as an endpoint.

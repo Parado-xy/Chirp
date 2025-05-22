@@ -17,7 +17,7 @@
 // Here in lies the mail router.
 import { Router } from "express";
 
-import { validateApiKey } from "../middlewares/validate.middlewares.js";
+import { validateApiKey } from "../middlewares/validateAPI.middlewares.js";
 import mailHandler from "./handlers/mail.handlers.js";
 
 /**

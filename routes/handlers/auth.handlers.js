@@ -13,7 +13,7 @@
 
 import { randomBytes } from 'crypto'; 
 import Joi from 'joi';
-
+import { generateToken } from '../../lib/jwt.lib.js';
 import Organization from '../../models/organization.model.js';
 
 /**
@@ -43,24 +43,47 @@ const registrationSchema = Joi.object({
       'string.email': 'Please provide a valid email address',
       'string.empty': 'Email address cannot be empty',
       'any.required': 'Email address is required'
-    })
+    }),
+
+  password: Joi.string()
+    .min(6)
+    .max(10)
+     .empty()
+    .messages(
+        {
+            'string.empty': 'Password cannot be empty',
+            'any.required': 'Password is required',
+            'string.min': 'Password must contain at lease {#limit} characters',
+            'string.max': 'Password must contain at most {#limit} characters',
+        }
+    )  
 });
 
+
 /**
- * Validation schema for API key authorization header
+ * Validation schema for sign in
  * 
  * @constant {Joi.ObjectSchema}
  */
-const apiKeyHeaderSchema = Joi.object({
-  authorization: Joi.string()
+const signinSchema = Joi.object({
+  email: Joi.string()
+    .email({ minDomainSegments: 2 })
     .required()
-    .pattern(/^Bearer [A-Za-z0-9]{64}$/)
+    .lowercase()
+    .trim()
     .messages({
-      'string.empty': 'Authorization header cannot be empty',
-      'string.pattern.base': 'Invalid Authorization format. Must be "Bearer YOUR_API_KEY"',
-      'any.required': 'Authorization header is required'
+      'string.email': 'Please provide a valid email address',
+      'string.empty': 'Email address cannot be empty',
+      'any.required': 'Email address is required'
+    }),
+  
+  password: Joi.string()
+    .required()
+    .messages({
+      'string.empty': 'Password cannot be empty',
+      'any.required': 'Password is required'
     })
-}).unknown(true); // Allow other headers
+});
 
 /**
  * Authentication handlers for organization management and API key validation
@@ -72,11 +95,12 @@ const authHandler = {
      * Registers a new organization and generates an API key
      * 
      * @async
-     * @function register-server
+     * @function register
      * @param {Object} req - Express request object
      * @param {Object} req.body - Request body containing organization details
      * @param {string} req.body.name - Organization name
      * @param {string} req.body.email - Organization email
+     * @param {string} req.body.password - Organization account password
      * @param {Object} res - Express response object
      * @param {Function} next - Express next middleware function
      * @returns {Object} JSON response with success status and API key
@@ -87,7 +111,7 @@ const authHandler = {
      * // POST /api/v1/auth/register
      * // { "name": "Test Org", "email": "org@example.com" }
      */
-    "register-server": async (req, res, next) => {
+    "register": async (req, res, next) => {
         try {
             // Validate request body using Joi
             const { error, value } = registrationSchema.validate(req.body, { 
@@ -105,7 +129,7 @@ const authHandler = {
             }
             
             // Destructure validated data
-            const { name, email } = value;
+            const { name, email, password } = value;
             
             // Generate an API KEY
             const apiKey = randomBytes(32).toString('hex');
@@ -114,13 +138,17 @@ const authHandler = {
             const org = await Organization.create({
                 name,
                 email,
+                password,
                 apiKey
             });
             
+            // Generate jwt token based on organization name, email, and organization id
+            let token = generateToken({id: org._id, name, email })
             // If we reach here, creation was successful
             return res.status(201).json({
                 success: true,
-                apiKey
+                apiKey,
+                token
             });
             
         } catch (error) {
@@ -138,47 +166,62 @@ const authHandler = {
     },
 
     /**
-     * Validates an API key from the Authorization header
+     * Authenticates an organization using email and password
      * 
      * @async
-     * @function allow-access
+     * @function signin
      * @param {Object} req - Express request object
-     * @param {Object} req.headers - Request headers
-     * @param {string} req.headers.authorization - Authorization header with Bearer token
+     * @param {Object} req.body - Request body containing credentials
+     * @param {string} req.body.email - Organization email address
+     * @param {string} req.body.password - Organization password
      * @param {Object} res - Express response object
      * @param {Function} next - Express next middleware function
-     * @returns {Object} JSON response with organization details if valid
-     * @throws {Error} When database operation fails
+     * @returns {Object} JSON response with JWT token and organization details if valid
+     * @throws {Error} When authentication fails or database operation fails
      * 
      * @example
      * // Example request:
-     * // GET /api/v1/auth/verify
-     * // Headers: { "Authorization": "Bearer abc123..." }
+     * // POST /api/v1/auth/signin
+     * // { "email": "org@example.com", "password": "securepass" }
      */
-    "allow-access": async (req, res, next) => {
+    "signin": async (req, res, next) => {
         try {
-            // Validate the authorization header using Joi
-            const { error } = apiKeyHeaderSchema.validate(req.headers, { 
-                abortEarly: true 
+            // Validate request body using Joi
+            const { error, value } = signinSchema.validate(req.body, { 
+                abortEarly: false,
+                stripUnknown: true
             });
             
+            // If validation fails, return error response
             if (error) {
-                return res.status(401).json({
+                const errorMessages = error.details.map(detail => detail.message);
+                return res.status(400).json({
                     success: false,
-                    message: error.details[0].message
+                    errors: errorMessages
                 });
             }
             
-            // Extract the API key from the Authorization header
-            const apiKey = req.headers.authorization.split(' ')[1];
+            // Destructure validated data
+            const { email, password } = value;
             
-            // Find the organization with this API key
-            const organization = await Organization.findOne({ apiKey });
+            // Find the organization with this email
+            const organization = await Organization.findOne({ email });
             
+            // Check if organization exists
             if (!organization) {
                 return res.status(401).json({
                     success: false,
-                    message: "Invalid API key"
+                    message: "Invalid email or password"
+                });
+            }
+            
+            // Verify password
+            const isPasswordValid = await organization.comparePassword(password);
+            
+            if (!isPasswordValid) {
+                return res.status(401).json({
+                    success: false,
+                    message: "Invalid email or password"
                 });
             }
             
@@ -190,13 +233,24 @@ const authHandler = {
                 });
             }
             
+            // Generate JWT token based on organization data
+            const token = generateToken({
+                id: organization._id,
+                name: organization.name,
+                email: organization.email
+            });
+            
             // Authentication successful
             return res.status(200).json({
                 success: true,
-                message: "API key is valid",
+                message: "Authentication successful",
+                token,
                 organization: {
                     id: organization._id,
-                    name: organization.name
+                    name: organization.name,
+                    email: organization.email,
+                    status: organization.status,
+                    usage: organization.usage
                 }
             });
         } catch (error) {

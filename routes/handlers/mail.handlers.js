@@ -17,9 +17,9 @@ import transporter from "../../services/send-mail.services.js";
 import { SMTP_USER } from "../../src/env.js";
 import Joi from "joi";
 import Organization from "../../models/organization.model.js";
-import { Queue } from "bullmq";
 import Email from "../../models/email.model.js";
-import redisClient, {isRedisConnected} from "../../databases/redis.databases.js";
+import  {isRedisConnected} from "../../databases/redis.databases.js";
+import emailQueue from "../../queues/email.queue.js";
 
 /**
  * Validation schema for mail requests
@@ -59,10 +59,7 @@ const mailSchema = Joi.object({
         })
 });
 
-// Create redis emailQueue. 
-const emailQueue = new Queue("emailQueue", {
-    connection: redisClient
-}); 
+ 
 
 /**
  * Mail handling functions
@@ -138,7 +135,9 @@ const mailHandler = {
                     to,
                     subject,
                     content,
-                    organization: req.organization._id
+                    organization: req.organization._id,
+                    status: "queued"
+
                 }
             );
 
@@ -155,7 +154,8 @@ const mailHandler = {
             // Update organization usage statistics
             await Organization.findByIdAndUpdate(organization._id, {
                 $inc: { 'usage.totalEmailsSent': 1 },
-                $set: { 'usage.lastEmailSentAt': new Date() }
+                $set: { 'usage.lastNotificationSentAt': new Date() },
+                $addToSet: {'emailList': to}
             });
             
             // Return success response

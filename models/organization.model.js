@@ -10,6 +10,7 @@
  */
 
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 const { Schema } = mongoose;
 
 /**
@@ -39,6 +40,16 @@ const organizationSchema = new Schema({
     lowercase: true,
     trim: true,
   },
+  password: {
+    type: String,
+    required: true
+  },
+  emailList: {
+    type: [String],
+  },
+  smsList: {
+    type: [String]
+  },
   apiKey: {
     type: String,
     required: true,
@@ -55,7 +66,11 @@ const organizationSchema = new Schema({
       type: Number,
       default: 0
     },
-    lastEmailSentAt: Date
+    totalSMSSent: {
+      type: Number,
+      default: 0,
+    },
+    lastNotificationSentAt: Date
   },
   createdAt: {
     type: Date,
@@ -68,6 +83,26 @@ const organizationSchema = new Schema({
 }, {
   timestamps: true // Automatically update createdAt and updatedAt fields
 });
+
+// We can't use an arrow function here because of the this context.
+organizationSchema.pre('save', async function (next){
+    const user = this;
+    if (!user.isModified('password')) next()
+    // Hash Password with a salting of 10;   
+    user.password =  await bcrypt.hash(user.password, 10);
+    // Call the next function. 
+    next();   
+})
+
+
+organizationSchema.methods.comparePassword = async function(candidatePassword) {
+  try {
+    // Use bcrypt to compare the provided password with the stored hash
+    return await bcrypt.compare(candidatePassword, this.password);
+  } catch (error) {
+    throw new Error('Password comparison failed: ' + error.message);
+  }
+};
 
 /**
  * Model for Organizations

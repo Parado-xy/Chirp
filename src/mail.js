@@ -10,6 +10,7 @@
  * @requires cors
  * @requires body-parser
  * @requires helmet
+ * @requires express-session
  * @requires ./env
  * @requires ../routes/dispatcher.routes
  * @requires ../middlewares/error.middlewares
@@ -25,9 +26,11 @@ import express from "express";
 import cors from "cors"; 
 import bodyParser from "body-parser";
 import helmet from "helmet";
+import session from 'express-session';
+import expressEjsLayouts from "express-ejs-layouts";
 
 // Import ENV variables.
-import { PORT, NODE_ENV, VERSION } from "./env.js";
+import { PORT, NODE_ENV, VERSION, JWT_SECRET } from "./env.js";
 
 // Import the Redis initialization function
 import redisClient, { initializeRedis } from '../databases/redis.databases.js';
@@ -68,6 +71,35 @@ server.use(bodyParser.json());
 server.use(express.urlencoded({ extended: false }));
 
 /**
+ * Add session middleware
+ * Configures session support for the application
+ */
+server.use(session({
+  secret: JWT_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: { 
+    secure: NODE_ENV === 'production',
+    maxAge: 3600000 // 1 hour
+  }
+}));
+
+/**
+ * Setup EJS view engine
+ * Configures the application to use EJS for rendering views
+ */
+server.use(expressEjsLayouts);
+server.set('view engine', 'ejs');
+server.set('views', './views');
+server.set('layout', '../views/layouts/main.ejs')
+
+/**
+ * Serve static files
+ * Configures the application to serve static files from the 'public' directory
+ */
+server.use(express.static('public'));
+
+/**
  * Connect API routes to the application
  * Routes are mounted under the versioned API path by the dispatcher
  */
@@ -90,6 +122,7 @@ server.use(errorMiddleware);
  * @returns {Promise<void>}
  */
 import connectToDatabase from "../databases/mongodb.databases.js";
+import startWorker from "./worker.js";
 
 /**
  * Start the HTTP server and initialize the database and Redis connections
@@ -104,6 +137,9 @@ async function startServer() {
     // Connect to Redis
     console.log('Connecting to Redis...');
     const redisConnected = await initializeRedis();
+
+    // Start worker. 
+    startWorker()
     
     if (!redisConnected) {
       console.error('WARNING: Redis connection failed. Email functionality will be limited.');

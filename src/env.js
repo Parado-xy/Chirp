@@ -18,7 +18,7 @@ import { config } from "dotenv";
  */
 config({
   // eslint-disable-next-line no-undef
-  path: `./config/.env.${process.env.NODE_ENV || "development"}.locals`,
+  path: `.env`,
 });
 
 export const {
@@ -34,5 +34,10 @@ export const {
   REDIS_HOST,
   REDIS_PORT,
   REDIS_PASSWORD,
+  REDIS_USERNAME,
+  JWT_EXPIRES_IN,
+  JWT_SECRET,
+  ACCOUNT_SID,
+  AUTH_TOKEN
   // eslint-disable-next-line no-undef
 } = process.env;
