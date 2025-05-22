@@ -1,3 +1,6 @@
+Collecting workspace informationI'll help you rewrite the readme.md file for hosting on Render. Here's an updated version that includes deployment information and Render-specific instructions:
+
+```markdown
 # Email & SMS Service API
 
 A robust microservice for programmatically sending emails and SMS messages through a RESTful API interface. This service implements an asynchronous processing architecture for reliable, high-volume message delivery.
@@ -7,10 +10,10 @@ A robust microservice for programmatically sending emails and SMS messages throu
 The service follows a modular microservice architecture with asynchronous job processing:
 
 ```
-┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│   Your Service   │     │   Email Service  │     │  Redis Queue &   │     │   Email Provider │
-│   or Application │────▶│      API         │────▶│  Worker Process  │────▶│   (Gmail, etc.) │
-└──────────────────┘     └──────────────────┘     └──────────────────┘     └──────────────────┘
+┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐     ┌────────────────┐
+│   Your Service   │     │ Email/SMS Service │     │  Redis Queue &   │     │ Message Provider│
+│   or Application │────▶│      API         │────▶│  Worker Process  │────▶│ (Gmail/Twilio) │
+└──────────────────┘     └──────────────────┘     └──────────────────┘     └────────────────┘
                                   │                        │
                                   │                        │
                          ┌────────▼────────────────────────▼─────────┐
@@ -24,44 +27,63 @@ The service follows a modular microservice architecture with asynchronous job pr
 ### Core Components:
 
 - **API Layer**: Express.js REST endpoints
-- **Authentication**: API key-based security
-- **Data Storage**: MongoDB for organization and email data
+- **Authentication**: API key & JWT-based security
+- **Data Storage**: MongoDB for organization and message data
 - **Job Queue**: Redis with BullMQ for reliable asynchronous processing
-- **Worker Process**: Background email sending with automatic retries
-- **Email Delivery**: Nodemailer with configurable providers
-- **Error Handling**: Centralized error processing
+- **Worker Process**: Background message sending with automatic retries
+- **Message Delivery**: Nodemailer for email, Twilio for SMS
+- **Error Handling**: Centralized error processing with detailed logging
 
-## 3. Setup & Installation
+## 2. Deployment on Render
 
 ### Prerequisites
 
-- Node.js (v14+)
-- MongoDB (local or hosted)
-- Redis server (local or hosted)
+- [Render](https://render.com) account
+- MongoDB Atlas database (or other hosted MongoDB)
+- Redis Cloud instance
 - SMTP credentials (Gmail or other provider)
+- Twilio account (for SMS functionality)
 
-### Installation Steps
+### Deployment Steps
 
-1. Clone the repository
-2. Install dependencies:
-   ```
-   npm install
-   ```
-3. Configure environment:
-   ```
-   cp config/.env.development.locals.example config/.env.development.locals
-   ```
-4. Edit .env.development.locals with your settings
-5. Start the API service:
-   ```
-   npm run dev
-   ```
-6. Start the worker process (in a separate terminal):
-   ```
-   node src/worker.js
-   ```
+1. Fork/Clone this repository to your GitHub account
 
-## 4. Authentication
+2. Create a new Web Service on Render:
+   - Connect your GitHub repository
+   - Select the branch to deploy
+   - Set build command: `npm install`
+   - Set start command: `npm start`
+
+3. Add Environment Variables in Render:
+   - `NODE_ENV`: `production`
+   - `PORT`: `10000` (Render will override this with its own PORT)
+   - `DB_URI`: Your MongoDB connection string
+   - `REDIS_HOST`: Your Redis Cloud host
+   - `REDIS_PORT`: Your Redis Cloud port
+   - `REDIS_PASSWORD`: Your Redis Cloud password
+   - `REDIS_USERNAME`: Your Redis Cloud username (if applicable)
+   - `SMTP_USER`: Your SMTP email address
+   - `SMTP_PASS`: Your SMTP password/app password
+   - `MAIL_SERVICE_PROVIDER`: Your email provider (e.g., `gmail`)
+   - `JWT_SECRET`: A secure random string
+   - `JWT_EXPIRES_IN`: Token expiration (e.g., `3h`)
+   - `ACCOUNT_SID`: Your Twilio account SID
+   - `AUTH_TOKEN`: Your Twilio auth token
+   - `VERSION`: `v1`
+
+4. Deploy the Worker Process:
+   - Create a new Background Worker on Render
+   - Connect to the same repository
+   - Set build command: `npm install`
+   - Set start command: `node src/worker.js`
+   - Add the same environment variables as above
+
+5. Verify Deployment:
+   - Check the logs to ensure both services start correctly
+   - Test the API endpoints
+   - Verify email and SMS delivery
+
+## 3. Authentication
 
 This service uses API key authentication to identify organizations:
 
@@ -70,7 +92,7 @@ This service uses API key authentication to identify organizations:
 3. The system **validates your API key** and identifies your organization
 4. **Usage statistics** are tracked per organization
 
-## 5. API Reference
+## 4. API Reference
 
 ### Authentication Endpoints
 
@@ -82,19 +104,19 @@ POST /api/v1/auth/register
 Request Body:
 {
   "name": "Your Organization Name",
-  "email": "contact@yourorganization.com"
+  "email": "contact@yourorganization.com",
+  "password": "secure-password"
 }
 
 Response:
 {
   "success": true,
-  "apiKey": "ed9a3d7648a570d729609a5266a8ce442d29b3f8bdbe0710b77597bc607af98e"
+  "apiKey": "ed9a3d7648a570d729609a5266a8ce442d29b3f8bdbe0710b77597bc607af98e",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
 ```
 
-### Email Endpoints
-
-#### Send Email
+### Email Endpoint
 
 ```
 POST /api/v1/mail
@@ -117,207 +139,86 @@ Response:
 }
 ```
 
-## 6. Usage Examples
+### SMS Endpoint
 
-### Sending an Email (with curl)
-
-```bash
-curl -X POST https://your-api.com/api/v1/mail \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "to": "recipient@example.com",
-    "subject": "Hello from API",
-    "content": "<h1>Hello!</h1><p>This is a test email sent via API.</p>"
-  }'
 ```
+POST /api/v1/sms
 
-### Integration Example (JavaScript)
+Headers:
+Authorization: Bearer YOUR_API_KEY
 
-```javascript
-async function sendEmail(apiKey, to, subject, content) {
-  const response = await fetch("https://your-api.com/api/v1/mail", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      to,
-      subject,
-      content,
-    }),
-  });
-
-  return await response.json();
-}
-
-// Usage
-sendEmail(
-  "your-api-key",
-  "customer@example.com",
-  "Welcome to our service!",
-  "<h1>Welcome</h1><p>Thank you for signing up!</p>"
-).then((result) => console.log(result));
-```
-
-### Integration Example (Python)
-
-```python
-import requests
-import json
-
-def send_email(api_key, to, subject, content):
-    url = "https://your-api.com/api/v1/mail"
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-
-    payload = {
-        "to": to,
-        "subject": subject,
-        "content": content
-    }
-
-    response = requests.post(url, headers=headers, json=payload)
-    return response.json()
-
-# Usage
-result = send_email(
-    "your-api-key",
-    "customer@example.com",
-    "Welcome to our service!",
-    "<h1>Welcome</h1><p>Thank you for signing up!</p>"
-)
-print(result)
-```
-
-## 7. Configuration
-
-### Environment Variables
-
-| Variable                | Description           | Example                                 |
-| ----------------------- | --------------------- | --------------------------------------- |
-| `PORT`                  | Server port           | `5679`                                  |
-| `NODE_ENV`              | Environment           | `development`                           |
-| `SMTP_USER`             | SMTP username         | `your@gmail.com`                        |
-| `SMTP_PASS`             | SMTP password         | `your-app-password`                     |
-| `MAIL_SERVICE_PROVIDER` | Email provider        | `gmail`                                 |
-| `DB_URI`                | MongoDB connection    | `mongodb://localhost:27017/MailService` |
-| `VERSION`               | API version           | `v1`                                    |
-| `REDIS_HOST`            | Redis server hostname | `localhost` or `172.22.86.56`           |
-| `REDIS_PORT`            | Redis server port     | `6379`                                  |
-| `REDIS_PASSWORD`        | Redis server password | `your-redis-password`                   |
-
-## 8. Error Handling
-
-All errors follow a consistent format:
-
-```json
+Request Body:
 {
-  "success": false,
-  "message": "Error message here"
+  "from": "+1234567890",
+  "to": "+9876543210",
+  "subject": "Alert",
+  "content": "This is a test SMS message"
+}
+
+Response:
+{
+  "success": true,
+  "message": "SMS queued successfully",
+  "smsId": "64f7a9b2e8d52a1f880c5e13"
 }
 ```
 
-Common error scenarios:
+## 5. Web Dashboard
 
-| Status | Scenario                  | Solution                                 |
-| ------ | ------------------------- | ---------------------------------------- |
-| 400    | Invalid request body      | Check your request parameters            |
-| 401    | Invalid/missing API key   | Verify your Authorization header         |
-| 403    | Account not active        | Contact support to activate your account |
-| 429    | Rate limit/quota exceeded | Wait or request a quota increase         |
-| 500    | Server error              | Contact support with error details       |
-| 503    | Service unavailable       | Redis queue service is down              |
+The service includes a web dashboard accessible at the root URL after deployment:
 
-## 9. Asynchronous Processing
+- **Organization Dashboard**: View usage statistics and API keys
+- **Test Interface**: Send test emails and SMS messages directly from the dashboard
+- **Activity Monitoring**: Track message delivery status and history
+- **Documentation**: Access API usage guides and examples
 
-This service processes emails asynchronously for improved reliability:
+## 6. Limitations and Usage
 
-1. When an email is requested, it is stored in the database and queued in Redis
-2. The API responds immediately with a success status and email ID
-3. A separate worker process picks up the email job and attempts delivery
-4. Failed deliveries are automatically retried with exponential backoff
-5. Email status is tracked in the database (queued, sent, failed)
+- Daily quota: 200 emails and SMS messages per organization
+- Rate limiting: Automatically enforced to prevent abuse
+- Phone numbers: Must use E.164 format (e.g., +1234567890)
+- SMS content: Limited to 1600 characters maximum
 
-### Running the Worker
-
-The worker process must be running to send emails:
-
-```bash
-# Start the worker process
-node src/worker.js
-```
-
-In production, use a process manager like PM2:
-
-```bash
-npm install -g pm2
-pm2 start src/worker.js --name "email-worker"
-```
-
-## 10. Limitations and Usage Policies
-
-- Daily email quota default: 200 emails per organization
-- Rate limit: Configurable per organization
-- Content restrictions: Follows standard email provider policies
-- Attachment support: Not available in MVP version
-- Worker concurrency: 5 emails processed simultaneously by default
-
-## 11. Best Practices
-
-- **Store your API key securely** - Never expose it in client-side code
-- **Handle errors gracefully** - Check for error responses in your code
-- **Implement idempotent requests** - Avoid duplicate emails on retries
-- **Monitor your usage** - Track your email sending quota
-- **Test thoroughly** - Before sending to real recipients
-- **Use a monitoring tool** - To ensure the worker process stays running
-
-## 12. Troubleshooting
+## 7. Troubleshooting
 
 ### Common Issues
 
 1. **Authentication Errors**
-
    - Verify API key format (should be a 64-character hex string)
    - Ensure proper "Bearer" prefix in Authorization header
 
-2. **Email Not Delivered**
-
+2. **Message Not Delivered**
    - Check if worker process is running
    - Verify Redis connection is active
-   - Check recipient address format
+   - Check recipient address/phone number format
    - Verify your account is active and within quota
-   - Check spam folders
 
-3. **Connection Issues**
-   - Verify your network connectivity
-   - Check MongoDB and Redis service status
+3. **Render Deployment Issues**
+   - Check environment variables are correctly set
+   - Review deployment logs for errors
+   - Ensure both web service and worker are running
 
 ### Getting Support
 
 For technical issues, contact support with:
-
 1. Your organization ID
 2. Request timestamp
 3. Error message received
-4. Email ID (if available)
+4. Message ID (if available)
 5. Steps to reproduce the issue
 
-## 13. Roadmap
+## 8. Security Recommendations
 
-Future features planned:
-
-- Email templates
-- Attachment support
-- Webhook notifications for email status changes
-- Analytics dashboard
-- Multi-region deployment
-- Horizontal worker scaling
+- Store your API key securely - never expose it in client-side code
+- Use HTTPS for all API requests
+- Rotate API keys periodically using the dashboard
+- Implement rate limiting on your end to prevent accidental API abuse
+- Monitor your usage statistics regularly
 
 ---
 
-This documentation provides a comprehensive guide to the Email Service API. For specific customization needs or further assistance, please contact the service administrator.
+This service provides a comprehensive solution for sending both emails and SMS messages through a unified API. For specific customization needs or further assistance, please contact the service administrator.
+```
+
+This updated readme includes Render-specific deployment instructions, mentions the SMS functionality, and provides a more streamlined structure that focuses on getting users up and running on Render quickly.
+
