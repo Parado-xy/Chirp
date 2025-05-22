@@ -33,7 +33,7 @@ import expressEjsLayouts from "express-ejs-layouts";
 import { PORT, NODE_ENV, VERSION, JWT_SECRET } from "./env.js";
 
 // Import the Redis initialization function
-import redisClient, { initializeRedis } from '../databases/redis.databases.js';
+import { initializeRedis } from '../databases/redis.databases.js';
 
 // Instantiate server. 
 const server = express(); 
@@ -122,7 +122,7 @@ server.use(errorMiddleware);
  * @returns {Promise<void>}
  */
 import connectToDatabase from "../databases/mongodb.databases.js";
-import startWorker from "./worker.js";
+
 
 /**
  * Start the HTTP server and initialize the database and Redis connections
@@ -138,8 +138,6 @@ async function startServer() {
     console.log('Connecting to Redis...');
     const redisConnected = await initializeRedis();
 
-    // Start worker. 
-    startWorker()
     
     if (!redisConnected) {
       console.error('WARNING: Redis connection failed. Email functionality will be limited.');
