@@ -9,11 +9,16 @@ import {
   REDIS_PASSWORD,
   REDIS_USERNAME,
 } from "../src/env.js";
+import logger from "../lib/logger.lib.js";
 
 // Global connection state tracker
 let isConnected = false;
 
-console.log(`Attempting Redis Cloud connection to ${REDIS_HOST}:${REDIS_PORT}`);
+logger.info(`Attempting Redis Cloud connection`, {
+  host: REDIS_HOST,
+  port: REDIS_PORT,
+  hasTLS: REDIS_HOST.includes("redis.cloud"),
+});
 
 /**
  * Configured Redis client instance using ioredis for Redis Cloud
@@ -36,27 +41,30 @@ const redisClient = new IORedis({
 
 // Detailed connection events
 redisClient.on("connect", () => {
-  console.log(`Redis connection established to ${REDIS_HOST}:${REDIS_PORT}`);
+  logger.info(`Redis connection established`, {
+    host: REDIS_HOST,
+    port: REDIS_PORT,
+  });
   isConnected = true;
 });
 
 redisClient.on("ready", () => {
-  console.log("Redis client is ready to send commands");
+  logger.info("Redis client is ready to send commands");
   isConnected = true;
 });
 
 redisClient.on("error", (error) => {
-  console.error("Redis connection error:", error);
+  logger.error("Redis connection error", { error: error.message });
   isConnected = false;
 });
 
 redisClient.on("close", () => {
-  console.log("Redis connection closed");
+  logger.warn("Redis connection closed");
   isConnected = false;
 });
 
 redisClient.on("reconnecting", () => {
-  console.log("Redis client reconnecting...");
+  logger.info("Redis client reconnecting...");
 });
 
 // Export a function to initialize the connection
@@ -64,10 +72,10 @@ export async function initializeRedis() {
   try {
     // Test the connection with a PING (ioredis connects automatically)
     const pingResult = await redisClient.ping();
-    console.log("Redis PING result:", pingResult);
+    logger.info("Redis PING successful", { result: pingResult });
     return true;
   } catch (error) {
-    console.error("Redis initialization failed:", error.message);
+    logger.error("Redis initialization failed", { error: error.message });
     return false;
   }
 }

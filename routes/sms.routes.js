@@ -1,13 +1,12 @@
 import { Router } from "express";
 import { validateApiKey } from "../middlewares/validateAPI.middlewares.js";
-
-const smsRouter = Router(); 
-
-smsRouter.use(validateApiKey); 
-
+import { smsLimiter } from "../middlewares/rateLimiter.middlewares.js";
 import smsHandler from "./handlers/sms.handlers.js";
 
-smsRouter.post(`/`, smsHandler['send-sms']); 
+const smsRouter = Router();
 
-export default smsRouter; 
+smsRouter.use(validateApiKey);
 
+smsRouter.post(`/`, smsLimiter, smsHandler["send-sms"]);
+
+export default smsRouter;

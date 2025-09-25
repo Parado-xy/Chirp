@@ -16,6 +16,7 @@
 import mongoose from "mongoose";
 
 import { DB_URI, NODE_ENV } from "../src/env.js";
+import logger, { logDatabaseOperation } from "../lib/logger.lib.js";
 
 // Verify that the database URI environment variable is defined
 if (!DB_URI) {
@@ -55,9 +56,19 @@ const connectToDatabase = async () => {
     });
 
     // Log successful connection
-    console.log(`Database connection successful to: ${NODE_ENV} environment.`);
+    logger.info(`Database connection successful`, {
+      environment: NODE_ENV,
+      poolSize: { max: 25, min: 10 },
+      timeouts: { socket: 45000, serverSelection: 5000 },
+    });
+
+    logDatabaseOperation("connect", "mongodb", { environment: NODE_ENV });
   } catch (err) {
-    console.error(err);
+    logger.error("Database connection failed", {
+      error: err.message,
+      stack: err.stack,
+      environment: NODE_ENV,
+    });
     // eslint-disable-next-line no-undef
     process.exit(1);
   }
